@@ -16,3 +16,4 @@ if ! command -v pyenv &> /dev/null; then
     pyenv global 3
 fi
 pip install ansible
+ansible-pull -U https://github.com/rhildred/ansible-vscode.git
