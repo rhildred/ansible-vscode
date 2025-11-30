@@ -7,9 +7,11 @@
       name: ubuntu
       create_home: yes
       append: true
-      groups: docker,sudo
+      groups: sudo
       shell: /bin/bash
     become: yes
+    args:
+      creates: /home/ubuntu
 
   - name: Create a source directory if it does not exist
     ansible.builtin.file:
@@ -19,6 +21,9 @@
       owner: ubuntu
       group: ubuntu
     become: yes
+    args:
+      creates: /home/ubuntu/source
+
 
   - name: install code-server
     ansible.builtin.shell: curl -fsSL https://code-server.dev/install.sh | sh
