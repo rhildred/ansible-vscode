@@ -1,0 +1,16 @@
+V#!/usr/bin/env bash
+
+apt update && apt get git
+
+if ! command -v "$EXECUTABLE" &> /dev/null; then
+    curl -fsSL https://pyenv.run | bash
+    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
+    export PYENV_ROOT="$HOME/.pyenv"
+    echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
+    [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+    echo 'eval "$(pyenv init - bash)"' >> ~/.bashrc
+    eval "$(pyenv init - bash)"
+    pyenv install 3
+    pyenv global 3
+fi
+pip install ansible
