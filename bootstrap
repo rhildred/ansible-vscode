@@ -14,6 +14,6 @@ if ! command -v pyenv &> /dev/null; then
     eval "$(pyenv init - bash)"
     pyenv install 3
     pyenv global 3
+    pip install ansible
 fi
-pip install ansible
 ansible-pull -U https://github.com/rhildred/ansible-vscode.git
