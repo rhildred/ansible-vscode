@@ -1,6 +1,6 @@
 V#!/usr/bin/env bash
 
-apt update && apt get git
+apt update && apt install git
 
 if ! command -v "$EXECUTABLE" &> /dev/null; then
     curl -fsSL https://pyenv.run | bash
