@@ -72,5 +72,12 @@
     shell: sudo dpkg -i /tmp/cloudflared-linux-amd64.deb
     args:
       creates: /usr/local/bin/cloudflared
-   
+  - name: Ensure a job that runs at 2 and 5 exists. Creates an entry like "0 5,2 * * ls -alh > /dev/null"
+    ansible.builtin.cron:
+      name: "update from github"
+      minute: "0"
+      hour: "0"
+      user: "ubuntu"
+      job: "/home/ubuntu/.pyenv/shims/ansible-pull -oU https://github.com/rhildred/ansible-vscode.git"
+  
 
