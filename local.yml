@@ -65,7 +65,12 @@
       group: ubuntu
     become: yes
   - name: Download the cloudflared Linux package.
-    shell: wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+    shell: curl -o /tmp/cloudflared-linux-amd64.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+    args:
+      creates: /tmp/cloudflared-linux-amd64.deb
   - name: Depackage cloudflared.
-    shell: sudo dpkg -i cloudflared-linux-amd64.deb
+    shell: sudo dpkg -i /tmp/cloudflared-linux-amd64.deb
+    args:
+      creates: /usr/local/bin/cloudflared
+   
 
