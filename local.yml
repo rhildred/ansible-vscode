@@ -27,12 +27,10 @@
     ansible.builtin.shell: sudo systemctl enable code-server@ubuntu
     args:
       creates: /etc/systemd/system/default.target.wants/code-server@ubuntu.service
-
-  - name: start code-server
-    ansible.builtin.shell: sudo systemctl start code-server@ubuntu
-    args:
-      creates: /home/ubuntu/.config/code-server/config.yaml
-
+  - name: Creates directory
+    ansible.builtin.file:
+      path: /home/ubuntu/.config/code-server
+      state: directory
   - name: Copy config
     ansible.builtin.copy:
       src: code-server-config.yml
@@ -41,9 +39,10 @@
       group: ubuntu
     become: yes
 
-  - name: restart code-server
-    ansible.builtin.shell: sudo systemctl restart code-server@ubuntu
-
+  - name: start code-server
+    ansible.builtin.shell: sudo systemctl start code-server@ubuntu
+    args:
+      creates: /home/ubuntu/.config/procps
 
   - name: download oauth2-proxy
     ansible.builtin.shell: curl -L -o /tmp/oauth2-proxy.tar.gz https://github.com/oauth2-proxy/oauth2-proxy/releases/download/v7.9.0/oauth2-proxy-v7.9.0.linux-amd64.tar.gz && tar -C /tmp -zxvf /tmp/oauth2-proxy.tar.gz && mv /tmp/oauth2-proxy-v7.9.0.linux-amd64 /usr/local
