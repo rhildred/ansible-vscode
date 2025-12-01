@@ -64,3 +64,8 @@
       owner: ubuntu
       group: ubuntu
     become: yes
+  - name: Download the cloudflared Linux package.
+    shell: wget https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+  - name: Depackage cloudflared.
+    shell: sudo dpkg -i cloudflared-linux-amd64.deb
+
