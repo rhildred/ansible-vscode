@@ -7,7 +7,6 @@
     ansible.builtin.apt:
       update_cache: yes
       upgrade: yes
-
   - name: Create a source directory if it does not exist
     ansible.builtin.file:
       path: /home/ubuntu/source
@@ -40,6 +39,7 @@
     ansible.builtin.copy:
       src: code-server-config.yml
       dest: /home/ubuntu/.config/code-server/config.yaml
+      force: no
       owner: ubuntu
       group: ubuntu
     become: yes
@@ -58,6 +58,7 @@
     ansible.builtin.copy:
       src: oauth2-proxy.service
       dest: /etc/systemd/system/oauth2-proxy.service
+      force: no
       owner: ubuntu
       group: ubuntu
     become: yes
@@ -65,6 +66,7 @@
     ansible.builtin.copy:
       src: oauth2-proxy.cfg.sample
       dest: /etc/oauth2-proxy.cfg
+      force: no
       owner: ubuntu
       group: ubuntu
     become: yes
@@ -83,5 +85,15 @@
       hour: "0"
       user: "ubuntu"
       job: "/home/ubuntu/.pyenv/shims/ansible-pull -oU https://github.com/rhildred/ansible-vscode.git"
+  - name: Check if a reboot is required by system files
+    ansible.builtin.stat:
+      path: /var/run/reboot-required
+    register: reboot_required_file
+
+  - name: Reboot the host if required
+    ansible.builtin.reboot:
+      reboot_timeout: 600 # Maximum seconds to wait for the host to return
+    when: reboot_required_file.stat.exists
+    # The 'when' condition ensures the task only runs if the file exists OR if the app install task made changes
   
 
