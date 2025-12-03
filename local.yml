@@ -49,13 +49,6 @@
       owner: ubuntu
       group: ubuntu
     become: yes
-  - name: start code-server
-    ansible.builtin.systemd:
-      name: code-server@ubuntu.service
-      state: restarted
-      enabled: yes
-    become: yes
-    when: app_install_result.changed
   - name: download oauth2-proxy
     ansible.builtin.shell: curl -L -o /tmp/oauth2-proxy.tar.gz https://github.com/oauth2-proxy/oauth2-proxy/releases/download/v7.9.0/oauth2-proxy-v7.9.0.linux-amd64.tar.gz && tar -C /tmp -zxvf /tmp/oauth2-proxy.tar.gz && mv /tmp/oauth2-proxy-v7.9.0.linux-amd64 /usr/local
     become: yes
@@ -103,4 +96,11 @@
     when: reboot_required_file.stat.exists
     # The 'when' condition ensures the task only runs if the file exists OR if the app install task made changes
   
-
+  - name: start code-server
+    ansible.builtin.systemd:
+      name: code-server@ubuntu.service
+      state: restarted
+      enabled: yes
+    become: yes
+    when: app_install_result.changed
+    # don't need to do this if reboot happened
