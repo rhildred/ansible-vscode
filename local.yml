@@ -2,6 +2,11 @@
   hosts: localhost
   gather_facts: false
   tasks:
+  - name: Update apt cache and upgrade packages
+    become: true
+    ansible.builtin.apt:
+      update_cache: yes
+      upgrade: yes
 
   - name: Create a source directory if it does not exist
     ansible.builtin.file:
