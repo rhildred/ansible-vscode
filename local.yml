@@ -7,6 +7,26 @@
     ansible.builtin.file:
       path: /usr/bin/code-server
       state: absent
+  - name: Add cloudflared GPG key
+    become: true
+    ansible.builtin.apt_key:
+      url: https://pkg.cloudflare.com/cloudflare-public-v2.gpg
+      state: present
+
+  - name: Add cloudflared stable repository
+    become: true
+    ansible.builtin.apt_repository:
+      repo: 'deb https://pkg.cloudflare.com/cloudflared any main'
+      state: present
+      filename: cloudflared
+      update_cache: yes
+
+  - name: Install cloudflared package
+    become: true
+    ansible.builtin.apt:
+      name: cloudflared
+      state: present
+      update_cache: yes
   - name: Update apt cache and upgrade packages
     become: true
     ansible.builtin.apt:
@@ -70,14 +90,6 @@
       owner: ubuntu
       group: ubuntu
     become: yes
-  - name: Download the cloudflared Linux package.
-    shell: curl -o /tmp/cloudflared-linux-amd64.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
-    args:
-      creates: /tmp/cloudflared-linux-amd64.deb
-  - name: Depackage cloudflared.
-    shell: sudo dpkg -i /tmp/cloudflared-linux-amd64.deb
-    args:
-      creates: /usr/local/bin/cloudflared
   - name: Ensure a job that runs at 2 and 5 exists. Creates an entry like "0 5,2 * * ls -alh > /dev/null"
     ansible.builtin.cron:
       name: "update from github"
