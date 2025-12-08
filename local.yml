@@ -1,7 +1,26 @@
 - name: bootstrap dev machine
   hosts: localhost
   gather_facts: false
+  vars:
+    nvm_user: ubuntu # The user to install NVM for
+    node_version: "22" # The desired Node.js version
   tasks:
+  - name: Download and install NVM
+    ansible.builtin.shell: |
+      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+    args:
+      creates: "/home/{{ nvm_user }}/.nvm/nvm.sh" # Prevents re-running if NVM is already installed
+    become_user: "{{ nvm_user }}" # Run as the specified user
+
+  - name: Source NVM and install Node.js
+    ansible.builtin.shell: |
+      source "/home/{{ nvm_user }}/.nvm/nvm.sh"
+      nvm install {{ node_version }}
+      nvm alias default {{ node_version }} # Set this version as default
+    args:
+      executable: /bin/bash # Ensure bash is used for sourcing
+    become_user: "{{ nvm_user }}"
+
   - name: Delete old copy of code-server
     become: true
     ansible.builtin.file:
@@ -12,7 +31,6 @@
     ansible.builtin.apt_key:
       url: https://pkg.cloudflare.com/cloudflare-public-v2.gpg
       state: present
-
   - name: Add cloudflared stable repository
     become: true
     ansible.builtin.apt_repository:
