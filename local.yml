@@ -2,135 +2,157 @@
   hosts: localhost
   gather_facts: false
   vars:
-    nvm_user: ubuntu # The user to install NVM for
-    node_version: "22" # The desired Node.js version
+    nvm_user: "ubuntu"      # The user to install NVM for
+    node_version: "22"     # The desired Node.js version
+
   tasks:
-  - name: Download and install NVM
-    ansible.builtin.shell: |
-      curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
-    args:
-      creates: "/home/{{ nvm_user }}/.nvm/nvm.sh" # Prevents re-running if NVM is already installed
-    become_user: "{{ nvm_user }}" # Run as the specified user
+    - name: Download and install NVM
+      ansible.builtin.shell:
+        cmd: |
+          curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.1/install.sh | bash
+      args:
+        creates: "/home/{{ nvm_user }}/.nvm/nvm.sh" # Prevents re-running if NVM is already installed
+      become_user: "{{ nvm_user }}" # Run as the specified user
 
-  - name: Source NVM and install Node.js
-    ansible.builtin.shell: |
-      source "/home/{{ nvm_user }}/.nvm/nvm.sh"
-      nvm install {{ node_version }}
-      nvm alias default {{ node_version }} # Set this version as default
-    args:
-      executable: /bin/bash # Ensure bash is used for sourcing
-    become_user: "{{ nvm_user }}"
+    - name: Source NVM and install Node.js
+      ansible.builtin.shell:
+        cmd: |
+          source "/home/{{ nvm_user }}/.nvm/nvm.sh"
+          nvm install {{ node_version }}
+          nvm alias default {{ node_version }} # Set this version as default
+      args:
+        executable: /bin/bash # Ensure bash is used for sourcing
+      become_user: "{{ nvm_user }}"
 
-  - name: Delete old copy of code-server
-    become: true
-    ansible.builtin.file:
-      path: /usr/bin/code-server
-      state: absent
-  - name: Add cloudflared GPG key
-    become: true
-    ansible.builtin.apt_key:
-      url: https://pkg.cloudflare.com/cloudflare-public-v2.gpg
-      state: present
-  - name: Add cloudflared stable repository
-    become: true
-    ansible.builtin.apt_repository:
-      repo: 'deb https://pkg.cloudflare.com/cloudflared any main'
-      state: present
-      filename: cloudflared
-      update_cache: yes
+    - name: Delete old copy of code-server
+      ansible.builtin.file:
+        path: /usr/bin/code-server
+        state: absent
+      become: true
 
-  - name: Install cloudflared package
-    become: true
-    ansible.builtin.apt:
-      name: cloudflared
-      state: present
-      update_cache: yes
-  - name: Update apt cache and upgrade packages
-    become: true
-    ansible.builtin.apt:
-      update_cache: yes
-      upgrade: yes
-  - name: Create a source directory if it does not exist
-    ansible.builtin.file:
-      path: /home/ubuntu/source
-      state: directory
-      mode: '0755'
-      owner: ubuntu
-      group: ubuntu
-    become: yes
+    - name: Create apt keyrings directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+      become: true
 
-  - name: install code-server
-    ansible.builtin.shell: curl -fsSL https://code-server.dev/install.sh | sh
-    args:
-      creates: /usr/bin/code-server
-    register: app_install_result      
+    - name: Add cloudflared GPG key (modern replacement for apt_key)
+      ansible.builtin.get_url:
+        url: https://pkg.cloudflare.com/cloudflare-public-v2.gpg
+        dest: /etc/apt/keyrings/cloudflare-public-v2.gpg
+        mode: '0644'
+      become: true
 
-  - name: make code-server a service
-    ansible.builtin.shell: systemctl enable --now code-server@\ubuntu
-    become: yes
-    args:
-      creates: /usr/lib/systemd/system/code-server@.service
+    - name: Add cloudflared stable repository with signed-by
+      ansible.builtin.apt_repository:
+        repo: 'deb [signed-by=/etc/apt/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main'
+        state: present
+        filename: cloudflared
+        update_cache: false # Handled globally in the next task
+      become: true
 
-  - name: enable code-server
-    ansible.builtin.shell: sudo systemctl enable code-server@ubuntu
-    args:
-      creates: /etc/systemd/system/default.target.wants/code-server@ubuntu.service
-  - name: Creates directory
-    ansible.builtin.file:
-      path: /home/ubuntu/.config/code-server
-      state: directory
-  - name: Copy config
-    ansible.builtin.copy:
-      src: code-server-config.yml
-      dest: /home/ubuntu/.config/code-server/config.yaml
-      force: no
-      owner: ubuntu
-      group: ubuntu
-    become: yes
-  - name: download oauth2-proxy
-    ansible.builtin.shell: curl -L -o /tmp/oauth2-proxy.tar.gz https://github.com/oauth2-proxy/oauth2-proxy/releases/download/v7.9.0/oauth2-proxy-v7.9.0.linux-amd64.tar.gz && tar -C /tmp -zxvf /tmp/oauth2-proxy.tar.gz && mv /tmp/oauth2-proxy-v7.9.0.linux-amd64 /usr/local
-    become: yes
-    args:
-      creates: /usr/local/oauth2-proxy-v7.9.0.linux-amd64/
-  - name: Copy service file
-    ansible.builtin.copy:
-      src: oauth2-proxy.service
-      dest: /etc/systemd/system/oauth2-proxy.service
-      force: no
-      owner: ubuntu
-      group: ubuntu
-    become: yes
-  - name: Copy service config
-    ansible.builtin.copy:
-      src: oauth2-proxy.cfg.sample
-      dest: /etc/oauth2-proxy.cfg
-      force: no
-      owner: ubuntu
-      group: ubuntu
-    become: yes
-  - name: Ensure a job that runs at 2 and 5 exists. Creates an entry like "0 5,2 * * ls -alh > /dev/null"
-    ansible.builtin.cron:
-      name: "update from github"
-      minute: "0"
-      hour: "0"
-      user: "ubuntu"
-      job: "/home/ubuntu/.pyenv/shims/ansible-pull -oU https://github.com/rhildred/ansible-vscode.git"
-  - name: Check if a reboot is required by system files
-    ansible.builtin.stat:
-      path: /var/run/reboot-required
-    register: reboot_required_file
+    - name: Update cache, upgrade system, and install cloudflared
+      ansible.builtin.apt:
+        name: cloudflared
+        state: present
+        update_cache: yes
+        upgrade: yes
+      become: true
 
-  - name: Reboot the host if required
-    ansible.builtin.reboot:
-      reboot_timeout: 600 # Maximum seconds to wait for the host to return
-    when: reboot_required_file.stat.exists
-    # The 'when' condition ensures the task only runs if the file exists OR if the app install task made changes
-  
-  - name: start code-server
-    ansible.builtin.systemd:
-      name: code-server@ubuntu.service
-      state: restarted
-      enabled: yes
-    become: yes
-    when: app_install_result.changed
-    # don't need to do this if reboot happened
+    - name: Create a source directory if it does not exist
+      ansible.builtin.file:
+        path: /home/ubuntu/source
+        state: directory
+        mode: '0755'
+        owner: ubuntu
+        group: ubuntu
+      become: yes
+
+    - name: install code-server
+      ansible.builtin.shell:
+        cmd: curl -fsSL https://code-server.dev/install.sh | sh
+      args:
+        creates: /usr/bin/code-server
+      register: app_install_result
+
+    - name: make code-server a service
+      ansible.builtin.shell:
+        cmd: systemctl enable --now code-server@\ubuntu
+      become: yes
+      args:
+        creates: /usr/lib/systemd/system/code-server@.service
+
+    - name: enable code-server
+      ansible.builtin.shell:
+        cmd: sudo systemctl enable code-server@ubuntu
+      args:
+        creates: /etc/systemd/system/default.target.wants/code-server@ubuntu.service
+
+    - name: Creates directory for code-server config
+      ansible.builtin.file:
+        path: /home/ubuntu/.config/code-server
+        state: directory
+
+    - name: Copy config
+      ansible.builtin.copy:
+        src: code-server-config.yml
+        dest: /home/ubuntu/.config/code-server/config.yaml
+        force: no
+        owner: ubuntu
+        group: ubuntu
+      become: yes
+
+    - name: download oauth2-proxy
+      ansible.builtin.shell:
+        cmd: |
+          curl -L -o /tmp/oauth2-proxy.tar.gz https://github.com/oauth2-proxy/oauth2-proxy/releases/download/v7.9.0/oauth2-proxy-v7.9.0.linux-amd64.tar.gz
+          tar -C /tmp -zxvf /tmp/oauth2-proxy.tar.gz
+          mv /tmp/oauth2-proxy-v7.9.0.linux-amd64 /usr/local
+      become: yes
+      args:
+        creates: /usr/local/oauth2-proxy-v7.9.0.linux-amd64/
+
+    - name: Copy service file
+      ansible.builtin.copy:
+        src: oauth2-proxy.service
+        dest: /etc/systemd/system/oauth2-proxy.service
+        force: no
+        owner: ubuntu
+        group: ubuntu
+      become: yes
+
+    - name: Copy service config
+      ansible.builtin.copy:
+        src: oauth2-proxy.cfg.sample
+        dest: /etc/oauth2-proxy.cfg
+        force: no
+        owner: ubuntu
+        group: ubuntu
+      become: yes
+
+    - name: Ensure github updates cron job exists
+      ansible.builtin.cron:
+        name: "update from github"
+        minute: "0"
+        hour: "0"
+        user: "ubuntu"
+        job: "/home/ubuntu/.pyenv/shims/ansible-pull -oU https://github.com/rhildred/ansible-vscode.git"
+
+    - name: Check if a reboot is required by system files
+      ansible.builtin.stat:
+        path: /var/run/reboot-required
+      register: reboot_required_file
+
+    - name: Reboot the host if required
+      ansible.builtin.reboot:
+        reboot_timeout: 600
+      when: reboot_required_file.stat.exists
+
+    - name: start code-server
+      ansible.builtin.systemd:
+        name: code-server@ubuntu.service
+        state: restarted
+        enabled: yes
+      become: yes
+      when: app_install_result.changed
