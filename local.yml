@@ -78,7 +78,7 @@
 
     - name: Fetch oauth2-proxy application binary release tarball
       ansible.builtin.get_url:
-        url: "https://github.com{{ oauth2_version }}/oauth2-proxy-v{{ oauth2_version }}.linux-amd64.tar.gz"
+        url: "https://github.com/oauth2-proxy/oauth2-proxy/releases/download/v{{ oauth2_version }}/oauth2-proxy-v{{ oauth2_version }}.linux-amd64.tar.gz"
         dest: "/tmp/oauth2-proxy.tar.gz"
         mode: '0644'
 
