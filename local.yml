@@ -48,7 +48,7 @@
 
     - name: install code-server via official bootstrap script
       ansible.builtin.shell:
-        cmd: curl -fsSL https://code-server.dev | sh
+        cmd: curl -fsSL https://code-server.dev/install.sh | sh
       args:
         creates: /usr/bin/code-server
       register: app_install_result
