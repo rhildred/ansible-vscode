@@ -8,16 +8,64 @@ sudo apt update && sudo apt install -y make build-essential libssl-dev zlib1g-de
     libbz2-dev libreadline-dev libsqlite3-dev wget curl llvm libncurses5-dev cron \
     libncursesw5-dev xz-utils tk-dev libffi-dev liblzma-dev python3-openssl git vim
 
-if ! command -v pyenv &> /dev/null; then
-    curl -fsSL https://pyenv.run | bash
-    echo 'export PYENV_ROOT="$HOME/.pyenv"' >> ~/.bashrc
-    export PYENV_ROOT="$HOME/.pyenv"
-    echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"' >> ~/.bashrc
-    [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-    echo 'eval "$(pyenv init - bash)"' >> ~/.bashrc
-    eval "$(pyenv init - bash)"
-    pyenv install 3
-    pyenv global 3
-    pip install ansible
+# ==============================================================================
+# CONFIGURATION
+# ==============================================================================
+TARGET_ENV="/opt/ansible_env"
+
+# ==============================================================================
+# STEP 1: CONDITIONAL PYENV CLEANUP
+# ==============================================================================
+if [ -d "$TARGET_ENV" ]; then
+    echo "✅ $TARGET_ENV already exists. Skipping pyenv removal and bootstrap."
+    echo "Running ansible-pull immediately..."
+else
+    echo "⚠️  $TARGET_ENV not found. Proceeding with pyenv purge and fresh bootstrap..."
+
+    # Kill any running processes utilizing pyenv binaries
+    pkill -u "$USER" -f "\.pyenv/versions" || true
+
+    # Delete pyenv directories
+    if [ -d "$HOME/.pyenv" ]; then
+        echo "Removing pyenv directory..."
+        rm -rf "$HOME/.pyenv"
+    fi
+
+    if [ -d "$HOME/.pyenv-virtualenv" ]; then
+        echo "Removing pyenv-virtualenv directory..."
+        rm -rf "$HOME/.pyenv-virtualenv"
+    fi
+
+    # Clean up shell configuration files safely
+    for config_file in "$HOME/.bashrc" "$HOME/.bash_profile" "$HOME/.zshrc" "$HOME/.profile"; do
+        if [ -f "$config_file" ]; then
+            echo "Cleaning up pyenv references from $config_file..."
+            cp "$config_file" "${config_file}.bak_pyenv"
+            sed -i '/PYENV_ROOT/d; /pyenv init/d; /pyenv virtualenv-init/d' "$config_file"
+        fi
+    done
+
+    # Sanitize the active session's environment variables
+    unset PYENV_ROOT
+    export PATH=$(echo "$PATH" | sed -E 's;[^:]+/\.pyenv/[^:]+:?;;g')
+
+    echo "🎉 pyenv removed. Proceeding with system installations..."
+
+    # ==============================================================================
+    # STEP 2: SYSTEM PYTHON & ANSTIBLE ENVIRONMENT BOOTSTRAP
+    # ==============================================================================
+    echo "Installing system prerequisites (git and python3-venv)..."
+    sudo apt-get update
+    sudo apt-get install -y python3-venv git
+
+    echo "Creating the global virtual environment at $TARGET_ENV..."
+    sudo python3 -m venv "$TARGET_ENV"
+
+    echo "Upgrading pip and installing Ansible inside the global venv..."
+    sudo "$TARGET_ENV/bin/pip" install --upgrade pip
+    sudo "$TARGET_ENV/bin/pip" install ansible
+    
+    echo "🚀 Bootstrap complete! Environment is fully prepared. Running ansible-pull"
 fi
-ansible-pull -U https://github.com/rhildred/ansible-vscode.git
+
+"$TARGET_ENV/bin/ansible-pull" -U https://github.com/rhildred/ansible-vscode.git
