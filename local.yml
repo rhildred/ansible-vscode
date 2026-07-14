@@ -40,15 +40,15 @@
 
     - name: Add cloudflared GPG key
       ansible.builtin.get_url:
-        url: https://cloudflare.com
+        url: https://pkg.cloudflare.com/cloudflare-main.gpg   # Updated to Cloudflare's current key URL
         dest: /etc/apt/keyrings/cloudflare-public-v2.gpg
         mode: '0644'
       become: true
 
     - name: Add cloudflared stable repository with signed-by
       ansible.builtin.apt_repository:
-        # Dynamically grabs the OS release codename (e.g., bookworm, jammy)
-        repo: "deb [signed-by=/etc/apt/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared {{ ansible_distribution_release }} main"
+        # Cloudflare's stable binary layout uses 'any' explicitly rather than the OS distribution name
+        repo: 'deb [signed-by=/etc/apt/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main'
         state: present
         filename: cloudflared
         update_cache: false
