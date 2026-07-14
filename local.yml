@@ -1,10 +1,10 @@
 - name: bootstrap dev machine
   hosts: localhost
-  gather_facts: true # MUST be true to gather runtime user attributes
+  gather_facts: true # Required to auto-discover your 'debian' runtime environment
   vars:
-    nvm_user: "{{ ansible_env.USER }}" # Dynamically reads 'debian', 'ubuntu', etc.
-    node_version: "22"                 # Desired Node.js version
-    oauth2_version: "7.9.0"            # Set target oauth2-proxy version
+    nvm_user: "{{ ansible_env.USER }}" # Gracefully falls back to active shell user
+    node_version: "22"                 # Target runtime version for Node
+    oauth2_version: "7.9.0"            # Target oauth2-proxy application version
 
   tasks:
     - name: Download and install NVM
@@ -25,33 +25,10 @@
         executable: /bin/bash
       become_user: "{{ nvm_user }}"
 
-    - name: Delete old copy of code-server
+    - name: Delete old copy of code-server if it exists
       ansible.builtin.file:
         path: /usr/bin/code-server
         state: absent
-      become: true
-
-    - name: Create apt keyrings directory
-      ansible.builtin.file:
-        path: /etc/apt/keyrings
-        state: directory
-        mode: '0755'
-      become: true
-
-    - name: Add cloudflared GPG key
-      ansible.builtin.get_url:
-        url: https://pkg.cloudflare.com/cloudflare-main.gpg   # Updated to Cloudflare's current key URL
-        dest: /etc/apt/keyrings/cloudflare-public-v2.gpg
-        mode: '0644'
-      become: true
-
-    - name: Add cloudflared stable repository with signed-by
-      ansible.builtin.apt_repository:
-        # Cloudflare's stable binary layout uses 'any' explicitly rather than the OS distribution name
-        repo: 'deb [signed-by=/etc/apt/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared any main'
-        state: present
-        filename: cloudflared
-        update_cache: false
       become: true
 
     - name: Update apt cache and upgrade system packages
@@ -60,13 +37,7 @@
         upgrade: yes
       become: true
 
-    - name: Install cloudflared package
-      ansible.builtin.apt:
-        name: cloudflared
-        state: present
-      become: true
-
-    - name: Create a source directory if it does not exist
+    - name: Create a source workspace directory
       ansible.builtin.file:
         path: "/home/{{ nvm_user }}/source"
         state: directory
@@ -75,20 +46,20 @@
         group: "{{ nvm_user }}"
       become: yes
 
-    - name: install code-server
+    - name: install code-server via official bootstrap script
       ansible.builtin.shell:
-        cmd: curl -fsSL https://code-server.dev/install.sh | sh
+        cmd: curl -fsSL https://code-server.dev | sh
       args:
         creates: /usr/bin/code-server
       register: app_install_result
 
-    - name: Enable code-server systemd service for the current user
+    - name: Enable code-server systemd multi-user template service
       ansible.builtin.systemd:
         name: "code-server@{{ nvm_user }}.service"
         enabled: yes
       become: yes
 
-    - name: Creates directory for code-server config
+    - name: Creates user directory structure for code-server configuration
       ansible.builtin.file:
         path: "/home/{{ nvm_user }}/.config/code-server"
         state: directory
@@ -96,7 +67,7 @@
         owner: "{{ nvm_user }}"
         group: "{{ nvm_user }}"
 
-    - name: Copy config
+    - name: Copy code-server base system configuration
       ansible.builtin.copy:
         src: code-server-config.yml
         dest: "/home/{{ nvm_user }}/.config/code-server/config.yaml"
@@ -105,29 +76,29 @@
         group: "{{ nvm_user }}"
       become: yes
 
-    - name: Download oauth2-proxy archive cleanly
+    - name: Fetch oauth2-proxy application binary release tarball
       ansible.builtin.get_url:
-        url: "https://github.com/oauth2-proxy/oauth2-proxy/releases/download/v{{ oauth2_version }}/oauth2-proxy-v{{ oauth2_version }}.linux-amd64.tar.gz"
+        url: "https://github.com{{ oauth2_version }}/oauth2-proxy-v{{ oauth2_version }}.linux-amd64.tar.gz"
         dest: "/tmp/oauth2-proxy.tar.gz"
         mode: '0644'
 
-    - name: Unarchive oauth2-proxy into targeted system path
+    - name: Extract target binary directory into default bin paths
       ansible.builtin.unarchive:
         src: "/tmp/oauth2-proxy.tar.gz"
         dest: "/usr/local/bin"
         remote_src: yes
-        extra_opts: ["--strip-components=1"] # Strips archive folder so binary goes directly to bin
+        extra_opts: ["--strip-components=1"]
         creates: "/usr/local/bin/oauth2-proxy"
       become: yes
 
-    - name: Deploy dynamic oauth2-proxy systemd service template
+    - name: Apply context values over oauth2-proxy service template file
       ansible.builtin.template:
         src: oauth2-proxy.service.j2
         dest: /etc/systemd/system/oauth2-proxy.service
         mode: '0644'
       become: yes
 
-    - name: Copy oauth2-proxy service configuration sample
+    - name: Transfer runtime application configuration file sample
       ansible.builtin.copy:
         src: oauth2-proxy.cfg.sample
         dest: /etc/oauth2-proxy.cfg
@@ -136,29 +107,29 @@
         group: "{{ nvm_user }}"
       become: yes
 
-    - name: Ensure github updates cron job points to pyenv path dynamically
+    - name: Verify that the background update cron job uses custom virtualenv path
       ansible.builtin.cron:
         name: "update from github"
         minute: "0"
         hour: "0"
         user: "{{ nvm_user }}"
-        job: "/home/{{ nvm_user }}/.pyenv/shims/ansible-pull -oU https://github.com"
+        job: "/opt/ansible_env/bin/ansible-pull -oU https://github.com/rhildred/ansible-vscode.git"
 
-    - name: Check if a reboot is required by system files
+    - name: Verify system runtime status if updates require reboots
       ansible.builtin.stat:
         path: /var/run/reboot-required
       register: reboot_required_file
 
-    - name: Reboot the host if required
+    - name: Perform machine software reboots if system flag is detected
       ansible.builtin.reboot:
         reboot_timeout: 600
       when: reboot_required_file.stat.exists
 
-    - name: Start code-server
+    - name: Force systemd state flush and assert code-server is active
       ansible.builtin.systemd:
         name: "code-server@{{ nvm_user }}.service"
         state: restarted
         enabled: yes
-        daemon_reload: yes # Flushes service modifications accurately
+        daemon_reload: yes
       become: yes
       when: app_install_result.changed
