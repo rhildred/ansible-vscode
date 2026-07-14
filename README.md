@@ -11,5 +11,6 @@ curl -fsSL https://raw.githubusercontent.com/rhildred/ansible-vscode/main/bootst
 1. Edit /etc/systemd/system/oauth2-proxy.service to have github_usernames_separated_by_commas the way you need it.
 1. run sudo systemctl enable oauth2-proxy.service
 1. run sudo systemctl start oauth2-proxy.service
+2. add hostname and 127.0.0.1:4180 to Caddyfile
 
 Now you should be able to login to your instance from the internet with your github credentials.
