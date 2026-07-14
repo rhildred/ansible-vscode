@@ -53,12 +53,16 @@
         update_cache: false
       become: true
 
-    - name: Update cache, upgrade system, and install cloudflared
+    - name: Update apt cache and upgrade system packages
+      ansible.builtin.apt:
+        update_cache: yes
+        upgrade: yes
+      become: true
+
+    - name: Install cloudflared package
       ansible.builtin.apt:
         name: cloudflared
         state: present
-        update_cache: yes
-        upgrade: yes
       become: true
 
     - name: Create a source directory if it does not exist
