@@ -47,7 +47,8 @@
 
     - name: Add cloudflared stable repository with signed-by
       ansible.builtin.apt_repository:
-        repo: 'deb [signed-by=/etc/apt/keyrings/cloudflare-public-v2.gpg] https://cloudflare.com any main'
+        # Dynamically grabs the OS release codename (e.g., bookworm, jammy)
+        repo: "deb [signed-by=/etc/apt/keyrings/cloudflare-public-v2.gpg] https://pkg.cloudflare.com/cloudflared {{ ansible_distribution_release }} main"
         state: present
         filename: cloudflared
         update_cache: false
